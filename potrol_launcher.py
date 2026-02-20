@@ -17,6 +17,8 @@ APP_USER_MODEL_ID = "ChampagneMetals.POtrol"
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8501
 STARTUP_TIMEOUT_SECONDS = 45
+WINDOWS_ALREADY_EXISTS_ERROR = 183
+SINGLE_INSTANCE_MUTEX_NAME = "Local\\ChampagneMetals.POtrol.SingleInstance"
 THEME_ARGS = [
     "--theme.base=light",
     "--theme.primaryColor=#0b67c2",
@@ -115,6 +117,52 @@ def set_windows_app_id() -> None:
         import ctypes
 
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception:
+        pass
+
+
+def acquire_single_instance_guard() -> int | None:
+    if sys.platform != "win32":
+        return 1
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_mutex = kernel32.CreateMutexW
+        create_mutex.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR]
+        create_mutex.restype = wintypes.HANDLE
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+
+        handle = create_mutex(None, False, SINGLE_INSTANCE_MUTEX_NAME)
+        if not handle:
+            return None
+        if int(ctypes.get_last_error()) == WINDOWS_ALREADY_EXISTS_ERROR:
+            close_handle(handle)
+            return None
+        return int(handle)
+    except Exception:
+        return 1
+
+
+def release_single_instance_guard(guard_handle: int | None) -> None:
+    if guard_handle is None:
+        return
+    if sys.platform != "win32":
+        return
+    if int(guard_handle) <= 0:
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+        close_handle(int(guard_handle))
     except Exception:
         pass
 
@@ -282,7 +330,13 @@ def main() -> int:
     serve_mode, passthrough_args = parse_mode_args(sys.argv[1:])
     if serve_mode:
         return run_server_mode(passthrough_args)
-    return run_desktop_mode(passthrough_args)
+    guard_handle = acquire_single_instance_guard()
+    if guard_handle is None:
+        return 0
+    try:
+        return run_desktop_mode(passthrough_args)
+    finally:
+        release_single_instance_guard(guard_handle)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,6 @@ import time
 import traceback
 from typing import Any
 from urllib.error import URLError
-from urllib.parse import quote
 from urllib.request import urlopen
 from uuid import uuid4
 
@@ -806,6 +805,13 @@ def hex_luminance(value: str, fallback: float = 0.5) -> float:
     return (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0
 
 
+def theme_preview_text_color(theme_palette: dict[str, str]) -> str:
+    start_luminance = hex_luminance(theme_palette.get("bg_start", ""), 0.5)
+    end_luminance = hex_luminance(theme_palette.get("bg_end", ""), 0.5)
+    average_luminance = (start_luminance + end_luminance) / 2.0
+    return "#111827" if average_luminance >= 0.62 else "#f8fbff"
+
+
 def resolve_theme_palette(theme_name: str) -> dict[str, str]:
     fallback_light = dict(THEME_PRESETS.get("Sky", {}))
     fallback_dark = dict(THEME_PRESETS.get("Midnight Aurora", {}))
@@ -850,26 +856,6 @@ def resolve_theme_palette(theme_name: str) -> dict[str, str]:
     if not str(resolved.get("disabled_text", "")).strip():
         resolved["disabled_text"] = str(resolved.get("muted", "#6e7280"))
     return {key: str(value) for key, value in resolved.items()}
-
-
-def get_query_param_text(name: str) -> str:
-    try:
-        raw_value: Any = st.query_params.get(name, "")
-    except Exception:
-        return ""
-    if isinstance(raw_value, list):
-        if not raw_value:
-            return ""
-        raw_value = raw_value[0]
-    return str(raw_value).strip()
-
-
-def clear_query_param(name: str) -> None:
-    try:
-        if name in st.query_params:
-            del st.query_params[name]
-    except Exception:
-        pass
 
 
 def canonical_theme_name(theme_name: str) -> str:
@@ -3490,6 +3476,27 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
+    if str(st.session_state.get(THEME_STATE_KEY, "")).strip() == "E-Ink":
+        st.markdown(
+            """
+            <style>
+                [data-testid="stPopover"] > div > button,
+                [data-testid="stPopover"] > div > button *,
+                [data-testid="stPopoverButton"] > button,
+                [data-testid="stPopoverButton"] > button *,
+                [class*="st-key-open_settings_menu_button"] button,
+                [class*="st-key-open_settings_menu_button"] button *,
+                [class*="st-key-open_about_menu_button"] button,
+                [class*="st-key-open_about_menu_button"] button * {
+                    color: #ffffff !important;
+                    fill: #ffffff !important;
+                    -webkit-text-fill-color: #ffffff !important;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
     if "location_options" not in st.session_state:
         st.session_state["location_options"] = load_location_options()
     if WORKBOOK_PATH_STATE_KEY not in st.session_state:
@@ -3535,12 +3542,6 @@ def main() -> None:
                 st.session_state.get(UPDATE_MANIFEST_URL_STATE_KEY, DEFAULT_UPDATE_MANIFEST_URL)
             ).strip(),
         )
-
-    requested_theme = get_query_param_text("apply_theme")
-    if requested_theme:
-        apply_theme_selection(requested_theme, reopen_settings=True)
-        clear_query_param("apply_theme")
-        st.rerun()
 
     @st.dialog("Settings", width="large")
     def show_settings_dialog() -> None:
@@ -3956,64 +3957,113 @@ def main() -> None:
 
                         theme_name = row_theme_names[column_index]
                         preview_theme = theme_preview_palettes[theme_name]
-                        preview_scheme = get_theme_scheme(theme_name)
                         is_active_theme = theme_name == current_theme_name
-                        active_class = " potrol-theme-card-active" if is_active_theme else ""
-                        preview_text_color = "#f5f8ff" if preview_scheme == "dark" else "#151922"
-                        preview_pill_background = (
-                            "rgba(255, 255, 255, 0.18)"
-                            if preview_scheme == "dark"
-                            else "rgba(17, 24, 39, 0.08)"
-                        )
-                        preview_pill_border = (
-                            "rgba(255, 255, 255, 0.46)"
-                            if preview_scheme == "dark"
-                            else "rgba(17, 24, 39, 0.24)"
-                        )
-                        scheme_pill_html = (
-                            f"<span class='potrol-theme-pill' style='color:{preview_text_color}; "
-                            f"border-color:{preview_pill_border}; background:{preview_pill_background};'>{scheme_label}</span>"
-                        )
-                        active_pill_html = (
-                            (
-                                f"<span class='potrol-theme-pill' style='color:{preview_text_color}; "
-                                f"border-color:{preview_pill_border}; background:{preview_pill_background};'>Active</span>"
-                            )
-                            if is_active_theme
-                            else ""
+                        preview_text_color = theme_preview_text_color(preview_theme)
+                        preview_accent_rgb = hex_to_rgb_triplet(
+                            preview_theme.get("accent", "#0b57d0"),
+                            "11, 87, 208",
                         )
 
                         with column:
-                            theme_card_html = (
-                                f'<div class="potrol-theme-card{active_class}" '
-                                f'style="background:linear-gradient(135deg, {preview_theme["bg_start"]} 0%, {preview_theme["bg_end"]} 100%); '
-                                f'border-color:{preview_theme["border"]}; --preview-text:{preview_text_color}; --preview-border:{preview_theme["border"]};">'
-                                f'<div class="potrol-theme-bar" style="background:linear-gradient(120deg, {preview_theme["accent"]} 0%, {preview_theme["accent_strong"]} 100%);"></div>'
-                                '<div class="potrol-theme-head">'
-                                f'<span class="potrol-theme-name">{theme_name}</span>'
-                                "</div>"
-                                '<div class="potrol-theme-meta">'
-                                f"{scheme_pill_html}"
-                                f"{active_pill_html}"
-                                "</div>"
-                                '<div class="potrol-theme-swatches">'
-                                f'<span class="potrol-theme-swatch" style="background:{preview_theme["accent"]};" title="Accent"></span>'
-                                f'<span class="potrol-theme-swatch" style="background:{preview_theme["accent_strong"]};" title="Accent Strong"></span>'
-                                f'<span class="potrol-theme-swatch" style="background:{preview_theme["surface"]};" title="Surface"></span>'
-                                f'<span class="potrol-theme-swatch" style="background:{preview_theme["surface_soft"]};" title="Surface Soft"></span>'
-                                f'<span class="potrol-theme-swatch" style="background:{preview_theme["border"]};" title="Border"></span>'
-                                "</div>"
-                                "</div>"
+                            theme_button_key = (
+                                f"settings_theme_card_apply_{hashlib.sha1(theme_name.encode('utf-8')).hexdigest()[:10]}"
                             )
-                            if is_active_theme:
-                                card_markup = theme_card_html
-                            else:
-                                apply_theme_href = f"?apply_theme={quote(theme_name, safe='')}"
-                                card_markup = (
-                                    f'<a class="potrol-theme-card-link" href="{apply_theme_href}" '
-                                    f'title="Apply {theme_name}">{theme_card_html}</a>'
-                                )
-                            st.markdown(card_markup, unsafe_allow_html=True)
+                            text_is_light = preview_text_color.casefold() in {"#f8fbff", "#ffffff", "white"}
+                            label_background = (
+                                "rgba(10, 14, 22, 0.46)"
+                                if text_is_light
+                                else "rgba(255, 255, 255, 0.76)"
+                            )
+                            label_border = (
+                                "rgba(255, 255, 255, 0.34)"
+                                if text_is_light
+                                else "rgba(17, 24, 39, 0.24)"
+                            )
+                            card_css = f"""
+<style>
+[class*='st-key-{theme_button_key}'] button {{
+    min-height: 8.2rem !important;
+    border-radius: 16px !important;
+    border: 1px solid {preview_theme["border"]} !important;
+    color: {preview_text_color} !important;
+    background-color: {preview_theme["bg_end"]} !important;
+    background-image:
+        linear-gradient(120deg, {preview_theme["accent"]} 0%, {preview_theme["accent_strong"]} 100%),
+        linear-gradient(180deg, {preview_theme["surface_soft"]} 0%, {preview_theme["surface_soft"]} 100%),
+        linear-gradient(180deg, {preview_theme["surface"]} 0%, {preview_theme["surface"]} 100%),
+        linear-gradient(180deg, {preview_theme["surface"]} 0%, {preview_theme["surface"]} 100%),
+        linear-gradient(180deg, rgba({preview_accent_rgb}, 0.44) 0%, rgba({preview_accent_rgb}, 0.44) 100%),
+        linear-gradient(180deg, rgba({preview_accent_rgb}, 0.28) 0%, rgba({preview_accent_rgb}, 0.28) 100%),
+        linear-gradient(135deg, {preview_theme["bg_start"]} 0%, {preview_theme["bg_end"]} 100%) !important;
+    background-repeat: no-repeat !important;
+    background-size:
+        100% 22%,
+        23% 66%,
+        62% 15%,
+        62% 15%,
+        34% 7%,
+        23% 7%,
+        100% 100% !important;
+    background-position:
+        0 0,
+        6% 27%,
+        32% 30%,
+        32% 50%,
+        32% 71%,
+        32% 82%,
+        0 0 !important;
+    padding: 5.05rem 0.62rem 0.62rem 0.62rem !important;
+    text-align: left !important;
+    white-space: pre-wrap !important;
+    line-height: 1.2 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 1px 2px rgba(17, 24, 39, 0.14) !important;
+    transition: transform 140ms ease, box-shadow 160ms ease, border-color 160ms ease !important;
+}}
+[class*='st-key-{theme_button_key}'] button p {{
+    color: {preview_text_color} !important;
+    font-size: 0.74rem !important;
+    line-height: 1.22 !important;
+    letter-spacing: 0.01em !important;
+    margin: 0 !important;
+    display: inline-block !important;
+    background: {label_background} !important;
+    border: 1px solid {label_border} !important;
+    border-radius: 10px !important;
+    padding: 0.23rem 0.42rem !important;
+    backdrop-filter: blur(1px) !important;
+}}
+[class*='st-key-{theme_button_key}'] button:hover {{
+    border-color: {preview_theme["accent"]} !important;
+    box-shadow: 0 10px 24px rgba({preview_accent_rgb}, 0.30), 0 0 0 1px rgba({preview_accent_rgb}, 0.20) !important;
+    transform: translateY(-2px) !important;
+}}
+[class*='st-key-{theme_button_key}'] button:focus-visible {{
+    box-shadow: 0 0 0 3px rgba({preview_accent_rgb}, 0.30), 0 10px 24px rgba({preview_accent_rgb}, 0.28) !important;
+}}
+[class*='st-key-{theme_button_key}'] button:disabled {{
+    opacity: 1 !important;
+    cursor: default !important;
+    transform: none !important;
+    border-color: {preview_theme["accent"]} !important;
+    box-shadow: 0 0 0 2px rgba({preview_accent_rgb}, 0.36), 0 9px 22px rgba({preview_accent_rgb}, 0.22) !important;
+}}
+[class*='st-key-{theme_button_key}'] button:disabled p {{
+    color: {preview_text_color} !important;
+}}
+</style>
+"""
+                            st.markdown(card_css, unsafe_allow_html=True)
+                            card_action = "Active" if is_active_theme else "Apply"
+                            theme_card_clicked = st.button(
+                                f"{theme_name}\n{scheme_label} preview: toolbar | cards | charts\n{card_action}",
+                                key=theme_button_key,
+                                use_container_width=True,
+                                disabled=is_active_theme,
+                            )
+                            if theme_card_clicked:
+                                apply_theme_selection(theme_name, reopen_settings=True)
+                                st.rerun()
 
             if not filtered_theme_names:
                 st.info("No themes match that search/filter.")
