@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="260" viewBox="0 0 920 260" role="img" aria-labelledby="title desc">
+  <title id="title">POtrol Logo</title>
+  <desc id="desc">Flat modern wordmark and icon for POtrol.</desc>
+
+  <g transform="translate(30 22)">
+    <rect x="0" y="0" width="200" height="200" rx="48" fill="#0b67c2"/>
+    <rect x="42" y="26" width="116" height="146" rx="18" fill="#f8fafc"/>
+    <rect x="42" y="26" width="116" height="34" rx="16" fill="#d9e4f2"/>
+    <rect x="62" y="82" width="76" height="10" rx="5" fill="#8ba4bf"/>
+    <rect x="62" y="104" width="76" height="10" rx="5" fill="#8ba4bf"/>
+    <rect x="62" y="126" width="52" height="10" rx="5" fill="#8ba4bf"/>
+    <circle cx="132" cy="138" r="22" fill="#14b8a6"/>
+    <path d="M121 138l8 8 16-17" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="52" y="38" width="42" height="14" rx="7" fill="#0f172a"/>
+    <text x="73" y="49" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="9" font-weight="700" fill="#ffffff">PO</text>
+  </g>
+
+  <g transform="translate(270 68)">
+    <text x="0" y="72" font-family="Segoe UI, Arial, sans-serif" font-size="100" font-weight="800" fill="#0f172a">POtrol</text>
+    <rect x="2" y="95" width="422" height="8" rx="4" fill="#0b67c2"/>
+    <text x="0" y="136" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="600" letter-spacing="2" fill="#476581">PURCHASE ORDER TRACKER</text>
+  </g>
+</svg>

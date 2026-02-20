@@ -1,0 +1,9 @@
+.venv/
+.venv-build/
+.venv-build312/
+__pycache__/
+.streamlit/
+*.pyc
+build/
+dist/
+*.log

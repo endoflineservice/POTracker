@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">POtrol Icon</title>
+  <desc id="desc">Flat modern purchase-order icon with a document and check mark.</desc>
+
+  <rect width="512" height="512" rx="108" fill="#e6eef8"/>
+  <rect x="44" y="44" width="424" height="424" rx="96" fill="#0b67c2"/>
+
+  <rect x="120" y="92" width="272" height="328" rx="34" fill="#f8fafc"/>
+  <rect x="120" y="92" width="272" height="68" rx="34" fill="#d9e4f2"/>
+  <rect x="166" y="206" width="180" height="18" rx="9" fill="#8ba4bf"/>
+  <rect x="166" y="248" width="180" height="18" rx="9" fill="#8ba4bf"/>
+  <rect x="166" y="290" width="126" height="18" rx="9" fill="#8ba4bf"/>
+
+  <circle cx="330" cy="330" r="50" fill="#14b8a6"/>
+  <path d="M304 332l18 18 36-38" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="138" y="116" width="86" height="30" rx="15" fill="#0f172a"/>
+  <text x="181" y="137" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">PO</text>
+</svg>
