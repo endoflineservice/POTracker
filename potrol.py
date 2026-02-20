@@ -92,7 +92,6 @@ WORKBOOK_LOCK_TIMEOUT_SECONDS = 12.0
 WORKBOOK_LOCK_STALE_SECONDS = 120.0
 WORKBOOK_SYNC_INTERVAL_SECONDS = 5
 PO_RESERVATION_STALE_SECONDS = 900.0
-PO_RESERVATION_SYNC_SECONDS = 8.0
 DRAFT_AUTOSAVE_MIN_SECONDS = 1.0
 APP_VERSION = "2026.02.19.1"
 WORKBOOK_OPEN_RETRY_COUNT = 3
@@ -482,12 +481,25 @@ DEFAULT_UPDATE_MANIFEST_URL = ""
 DESKTOP_MODE_ENV_VAR = "POTROL_DESKTOP_MODE"
 BROWSER_MODE_OVERRIDE_ENV_VAR = "POTROL_ALLOW_BROWSER_MODE"
 
-SESSION_ID = uuid4().hex
+SESSION_ID_STATE_KEY = "state::session_id"
+SESSION_ID_FALLBACK = uuid4().hex
 SESSION_OWNER = (
     f"{os.environ.get('USERNAME', 'user')}@"
     f"{os.environ.get('COMPUTERNAME', socket.gethostname())}"
 )
 _PO_SEQUENCE_CACHE: dict[tuple[str, str, str, str], set[int]] = {}
+
+
+def get_session_id() -> str:
+    try:
+        cached_session_id = str(st.session_state.get(SESSION_ID_STATE_KEY, "")).strip()
+        if cached_session_id:
+            return cached_session_id
+        new_session_id = uuid4().hex
+        st.session_state[SESSION_ID_STATE_KEY] = new_session_id
+        return new_session_id
+    except Exception:
+        return SESSION_ID_FALLBACK
 
 
 def sanitize_headers(raw_headers: list[Any]) -> list[str]:
@@ -2549,7 +2561,7 @@ def build_diagnostics_payload(
         "python": sys.version.split(" ")[0],
         "executable": sys.executable,
         "session_owner": SESSION_OWNER,
-        "session_id": SESSION_ID,
+        "session_id": get_session_id(),
         "workbook_path": str(workbook_path),
         "workbook_exists": workbook_exists,
         "workbook_writable": workbook_writable,
@@ -4369,6 +4381,7 @@ def main() -> None:
         st.session_state[workbook_signature_state_key] = get_workbook_signature(workbook_path)
     if workbook_last_sync_state_key not in st.session_state:
         st.session_state[workbook_last_sync_state_key] = datetime.now().strftime("%H:%M:%S")
+    session_id = get_session_id()
 
     def sync_reserved_po_number(force_refresh: bool = False) -> str:
         cached_po = str(st.session_state.get(reservation_po_state_key, "")).strip()
@@ -4383,15 +4396,14 @@ def main() -> None:
             except Exception:
                 cached_po = f"{PO_PREFIX}{PO_START_NUMBER}"
 
-        now_ts = time.time()
-        last_sync = float(st.session_state.get(reservation_sync_at_state_key, 0.0) or 0.0)
-        if not force_refresh and cached_po and (now_ts - last_sync) < PO_RESERVATION_SYNC_SECONDS:
+        if cached_po and not force_refresh:
             return cached_po
 
+        now_ts = time.time()
         try:
             reserved_po = reserve_session_po_number(
                 path=workbook_path,
-                session_id=SESSION_ID,
+                session_id=session_id,
                 owner_label=SESSION_OWNER,
                 sheet_name=sheet_name,
                 prefix=PO_PREFIX,
@@ -4424,7 +4436,6 @@ def main() -> None:
             if workbook_changed:
                 load_sheet_data.clear()
                 st.session_state[workbook_last_sync_state_key] = datetime.now().strftime("%H:%M:%S")
-                sync_reserved_po_number(force_refresh=True)
                 st.rerun()
 
             refreshed_po_number = sync_reserved_po_number(force_refresh=False)
@@ -4432,7 +4443,7 @@ def main() -> None:
 
         render_live_po_number()
         st.caption(
-            f"PO auto-sync every {LIVE_PO_REFRESH_INTERVAL_SECONDS} seconds | "
+            f"Workbook check every {LIVE_PO_REFRESH_INTERVAL_SECONDS} seconds | "
             f"Workbook sync: {st.session_state.get(workbook_last_sync_state_key, '--:--:--')}"
         )
         entry_date_value = date.today()
@@ -4794,13 +4805,13 @@ def main() -> None:
                     st.session_state[workbook_signature_state_key] = get_workbook_signature(workbook_path)
                     st.session_state[workbook_last_sync_state_key] = datetime.now().strftime("%H:%M:%S")
                     try:
-                        release_session_po_reservation(workbook_path, SESSION_ID)
+                        release_session_po_reservation(workbook_path, session_id)
                     except Exception:
                         pass
                     try:
                         st.session_state[reservation_po_state_key] = reserve_session_po_number(
                             path=workbook_path,
-                            session_id=SESSION_ID,
+                            session_id=session_id,
                             owner_label=SESSION_OWNER,
                             sheet_name=sheet_name,
                             prefix=PO_PREFIX,
