@@ -4135,9 +4135,8 @@ def main() -> None:
 </style>
 """
                             st.markdown(card_css, unsafe_allow_html=True)
-                            card_action = "Active" if is_active_theme else "Apply"
                             theme_card_clicked = st.button(
-                                f"{theme_name}\n{scheme_label} preview: toolbar | cards | charts\n{card_action}",
+                                theme_name,
                                 key=theme_button_key,
                                 use_container_width=True,
                                 disabled=is_active_theme,
